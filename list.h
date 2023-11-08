@@ -10,22 +10,24 @@ struct Node
 
 struct List
 {
-    Node *node = NULL;
+    Node *node = nullptr;
     int capacity = 0;
     int size = 0;
     int free = 0;
 };
 
-int List_ctor(List *lst);
-int Push_front(List *lst, int elem);
-int Insert_after(List *lst, int elem, size_t val);
-int Insert_before(List *lst, int elem, size_t val);
-int Delete(List *lst, size_t val);
-int Push_back(List *lst, int elem);
-int List_dump(List *lst);
-int Pop_front(List *lst);
-int Pop_back(List *lst);
-void Do_realloc(List *lst);
+int List_ctor(List *list);
+int Push_front(List *list, int elem);
+int Insert_after(List *list, int elem, size_t val);
+int Insert_before(List *list, int elem, size_t val);
+int Delete(List *list, size_t val, int *elem);
+int Push_back(List *list, int elem);
+int List_dump(List *list);
+int Pop_front(List *list, int *elem);
+int Pop_back(List *list, int *elem);
+void Do_realloc(List *list);
+void List_dtor(List *list);
+void List_verificator(List *list);
 
 
 #endif
