@@ -4,36 +4,44 @@
 
 #include "list.h"
 
-const int INITAL_SIZE = 13;
-const int NO_CONNECTION = 123;
+const int LAST_CONNECTION = 123;
 const int POISON = 666;
+const int LIST_FAULT = 0;
+const int lIST_IN_ORDER = 1;
 
-int List_ctor(List *list)
+int List_ctor(List *list, int capacity)
 {
-    list->node = (Node *)calloc(INITAL_SIZE + 1, sizeof(Node));
+    if(capacity <= 0)
+    {
+        printf("Think about the value of the initial capacity again\n");
+        return LIST_FAULT;
+    }
+
+    list->node = (Node *)calloc(capacity + 1, sizeof(Node));
+
+    if(list->node == nullptr)
+    {
+        printf("There is news: the calloc hasn't worked\n");
+        return LIST_FAULT;
+    }
+
     list->free = 1;
     list->size = 1;
-    list->capacity = INITAL_SIZE + 1;
-
-    for(int i = 1; i < list->capacity - 1; i++)
-    {
-        list->node[i].next = i + 1;
-        list->node[i].prev = -1;
-    }
+    list->capacity = capacity + 1;
 
     list->node[0].data = POISON;
     list->node[0].next = 0;
     list->node[0].prev = 0;
 
-    list->node[list->capacity - 1].next = NO_CONNECTION;
-    list->node[list->capacity - 1].prev = -1;
+    Fill_free_cells(list);
 
     return list->free;
 }
 
-int Push_front(List *list, int elem)
+int Push_front(List *list, list_t elem)
 {
-    assert(list != nullptr);
+    if(!List_verificator(list))
+        return LIST_FAULT;
 
     if(list->capacity <= list->size + 1)
         Do_realloc(list);
@@ -41,12 +49,12 @@ int Push_front(List *list, int elem)
     int free = list->free;
     int next_free_cell = list->node[list->free].next;
 
-    list->node[list->free].data = elem;
-    list->node[list->free].next = list->node[0].next;
-    list->node[list->free].prev = 0;
+    list->node[free].data = elem;
+    list->node[free].next = list->node[0].next;
+    list->node[free].prev = 0;
 
-    list->node[list->node[0].next].prev = list->free;
-    list->node[0].next = list->free;
+    list->node[list->node[0].next].prev = free;
+    list->node[0].next = free;
 
     list->free = next_free_cell;
     list->size++;
@@ -54,21 +62,22 @@ int Push_front(List *list, int elem)
     return free;
 }
 
-int Push_back(List *list, int elem)
+int Push_back(List *list, list_t elem)
 {
-    assert(list != nullptr);
+    if(!List_verificator(list))
+        return LIST_FAULT;
 
     if(list->capacity <= list->size + 1)
         Do_realloc(list);
 
     int free = list->free;
-    int next_free_cell = list->node[list->free].next;
+    int next_free_cell = list->node[free].next;
 
-    list->node[list->free].data = elem;
-    list->node[list->free].next = 0;
-    list->node[list->free].prev = list->node[0].prev;
-    list->node[list->node[0].prev].next = list->free;
-    list->node[0].prev = list->free;
+    list->node[free].data = elem;
+    list->node[free].next = 0;
+    list->node[free].prev = list->node[0].prev;
+    list->node[list->node[0].prev].next = free;
+    list->node[0].prev = free;
 
     list->free = next_free_cell;
     list->size++;
@@ -78,110 +87,127 @@ int Push_back(List *list, int elem)
 
 int List_dump(List *list)
 {
-    assert(list != nullptr);
+    if(!List_verificator(list))
+        return LIST_FAULT;
 
     FILE *fp = fopen("dump.dot", "w+");
 
     if(fp == nullptr)
     {
-        printf("I can't open the file, go get some sleep, honey) you'll continue in the morning...");
-        abort();
+        printf("I can't open the file, go get some sleep, honey) you'll continue in the morning...\n");
+        return LIST_FAULT;
     }
 
-    fprintf(fp, "digraph G                                                                               \n"
-                "{                                                                                       \n"
-                "   rankdir = LR;                                                                        \n"
-                "   node [style = \"filled\", shape = record, color = \"black\"];       \n"
-                "   size [fillcolor = \"pink\", label = \"size = %d\"];                                  \n"
-                "   capacity [fillcolor = \"violet\", label = \"capacity = %d\"];                        \n"
-                "   free [fillcolor = \"purple\", label = \"free = %d\"];                                \n"
-                "   tail [fillcolor = \"red\", label = \"tail = %d\"];                                   \n"
-                "   head [fillcolor = \"red\", label = \"head = %d\"];                                   \n",
-                list->size, list->capacity, list->free, list->node[0].next, list->node[0].prev);
+    fprintf(fp, "digraph G                                                            \n"
+                "{                                                                    \n"
+                "   rankdir = LR;                                                     \n"
+                "   node [style = \"filled\", shape = record, color = \"black\"];     \n"
+                "   size [fillcolor = \"pink\", label = \"size = %d\"];               \n"
+                "   capacity [fillcolor = \"violet\", label = \"capacity = %d\"];     \n"
+                "   free [fillcolor = \"purple\", label = \"free = %d\"];             \n"
+                "   tail [fillcolor = \"red\", label = \"tail = %d\"];                \n"
+                "   head [fillcolor = \"red\", label = \"head = %d\"];                \n",
+                list->size, list->capacity, list->free, list->node[0].prev, list->node[0].next);
 
     for(int i = 0; i < list->capacity; i++)
     {
-         fprintf(fp,       "    node%d [fillcolor = \"purple\", label = \" %d | { <prev> prev = %d |data = %d| <next> next = %d}\"];      \n",
-                            i, i, list->node[i].prev, list->node[i].data, list->node[i].next);
+        if(list->node[i].prev != -1)
+            fprintf(fp,     "    node%d [fillcolor = \"purple\", label = \" %d |"
+                            "{ <prev> prev = %d |data = %d| <next> next = %d}\"];\n",
+                        i, i, list->node[i].prev, list->node[i].data, list->node[i].next);
+        else
+            fprintf(fp,     "    node%d [fillcolor = \"pink\", label = \" %d |"
+                            "{ <prev> prev = %d |data = %d| <next> next = %d}\"];\n",
+                        i, i, list->node[i].prev, list->node[i].data, list->node[i].next);
     }
 
-    fprintf(fp, "   edge [style = invis, constraint = true];\n");
+    fprintf(fp, "   edge [style = invis];\n");
     for(int i = 0; i < list->capacity - 1; i++)
         fprintf(fp, "    node%d: <next> -> node%d: <next>;\n", i, i + 1);
 
-    fprintf(fp, "   edge [color = \"green\", constraint = true, style = solid];\n");
+    fprintf(fp, "   edge [color = \"black\", style = solid, weight = 0];\n");
     for(int i = 0; i < list->capacity - 1; i++)
-        fprintf(fp, "    node%d: <next> -> node%d: <next>;\n", i, list->node[i].next);
+        fprintf(fp, "    node%d: <next> -> node%d;\n", i, list->node[i].next);
 
-    fprintf(fp, "   edge [color = \"blue\", constraint = true, style = solid];\n");
+    /*fprintf(fp, "   edge [color = \"blue\", constraint = false, style = solid, weight = 0];\n");
     for(int i = 0; i < list->capacity - 1; i++)
     {
         if(list->node[i].prev != - 1)
-            fprintf(fp, "    node%d: <prev> -> node%d: <prev>;\n", i, list->node[i].prev);
+            fprintf(fp, "    node%d: <prev> -> node%d;\n", i, list->node[i].prev);
     }
+    */
+
+    fprintf(fp, "   edge [color = \"green\", style = bold, constraint = false];              \n");
+    fprintf(fp, "   free -> node%d;                                                          \n"
+                "   tail  -> node%d;                                                         \n"
+                "   head  -> node%d;                                                         \n",
+                list->free, list->node[0].prev, list->node[0].next);
 
     fprintf(fp, "}\n");
 
     fclose(fp);
 }
 
-int Pop_front(List *list, int *elem)
+int Pop_front(List *list, list_t *elem)
 {
-    assert(list != nullptr);
+    if(!List_verificator(list))
+        return LIST_FAULT;
 
     if(list->capacity <= list->size + 1)
         Do_realloc(list);
 
-    int tmp = list->node[0].next;
-    *elem = list->node[list->node[0].next].data;
+    int index = list->node[0].next;
+    *elem = list->node[index].data;
 
-    list->node[list->node[0].next].prev = -1;
-    list->node[list->node[list->node[0].next].next].prev = 0;
-    list->node[0].next = list->node[list->node[0].next].next;
-    list->node[tmp].next = list->free;
+    list->node[index].prev = -1;
+    list->node[list->node[index].next].prev = 0;
+    list->node[0].next = list->node[index].next;
+    list->node[index].next = list->free;
 
-    list->free = tmp;
+    list->free = index;
     list->size--;
 
-    return tmp;
+    return index;
 }
 
-int Pop_back(List *list, int *elem)
+int Pop_back(List *list, list_t *elem)
 {
-    assert(list != nullptr);
+    if(!List_verificator(list))
+        return LIST_FAULT;
 
     if(list->capacity <= list->size + 1)
         Do_realloc(list);
 
-    int tmp = list->node[0].prev;
+    int index = list->node[0].prev;
     *elem = list->node[list->node[0].prev].data;
 
-    list->node[list->node[0].prev].next = list->free;
-    list->node[list->node[list->node[0].prev].prev].next = 0;
-    list->node[0].prev = list->node[list->node[0].prev].prev;
-    list->node[tmp].prev = -1;
+    list->node[index].next = list->free;
+    list->node[list->node[index].prev].next = 0;
+    list->node[0].prev = list->node[index].prev;
+    list->node[index].prev = -1;
 
-    list->free = tmp;
+    list->free = index;
     list->size--;
 
-    return tmp;
+    return index;
 }
 
-int Insert_after(List *list, int elem, size_t val)
+int Insert_after(List *list, size_t index, list_t elem)
 {
-    assert(list != nullptr);
+    if(!List_verificator(list))
+        return LIST_FAULT;
 
     if(list->capacity <= list->size + 1)
         Do_realloc(list);
 
     int free = list->free;
-    int next_free_cell = list->node[list->free].next;
+    int next_free_cell = list->node[free].next;
 
-    list->node[list->free].data = elem;
-    list->node[list->free].next = list->node[val].next;
-    list->node[list->free].prev = val;
-    list->node[list->node[val].next].prev = list->free;
-    list->node[val].next = list->free;
+    list->node[free].data = elem;
+    list->node[free].next = list->node[index].next;
+    list->node[free].prev = index;
+    list->node[list->node[index].next].prev = free;
+    list->node[index].next = free;
 
     list->free = next_free_cell;
     list->size++;
@@ -189,21 +215,22 @@ int Insert_after(List *list, int elem, size_t val)
     return free;
 }
 
-int Insert_before(List *list, int elem, size_t val)
+int Insert_before(List *list, size_t index, list_t elem)
 {
-    assert(list != nullptr);
+    if(!List_verificator(list))
+        return LIST_FAULT;
 
     if(list->capacity <= list->size + 1)
         Do_realloc(list);
 
     int free = list->free;
-    int next_free_cell = list->node[list->free].next;
+    int next_free_cell = list->node[free].next;
 
-    list->node[list->free].data = elem;
-    list->node[list->free].next = val;
-    list->node[list->free].prev = list->node[val].prev;
-    list->node[list->node[val].prev].next = list->free;
-    list->node[val].prev = list->free;
+    list->node[free].data = elem;
+    list->node[free].next = index;
+    list->node[free].prev = list->node[index].prev;
+    list->node[list->node[index].prev].next = free;
+    list->node[index].prev = free;
 
     list->free = next_free_cell;
     list->size++;
@@ -211,70 +238,100 @@ int Insert_before(List *list, int elem, size_t val)
     return free;
 }
 
-int Delete(List *list, size_t val, int *elem)
+int Delete(List *list, size_t index, list_t *elem)
 {
-    assert(list != nullptr);
+    if(!List_verificator(list))
+        return LIST_FAULT;
 
     if(list->capacity <= list->size + 1)
         Do_realloc(list);
 
-    *elem = list->node[val].data;
+    *elem = list->node[index].data;
 
-    list->node[val].data = 0;
-    list->node[list->node[val].prev].next = list->node[val].next;
-    list->node[list->node[val].next].prev = list->node[val].prev;
-    list->node[val].next = list->free;
-    list->node[val].prev = -1;
+    list->node[index].data = 0;
+    list->node[list->node[index].prev].next = list->node[index].next;
+    list->node[list->node[index].next].prev = list->node[index].prev;
+    list->node[index].next = list->free;
+    list->node[index].prev = -1;
 
-    list->free = val;
+    list->free = index;
     list->size--;
 
-    return val;
+    return index;
 }
 
-void Do_realloc(List *list)
+int Do_realloc(List *list)
 {
-    assert(list != nullptr);
+    if(!List_verificator(list))
+        return LIST_FAULT;
 
     list->capacity = 2 * list->capacity;
 
-    printf("capacity = %d", list->capacity);
-
     list->node = (Node *)realloc(list->node, list->capacity * sizeof(Node));
 
-    for(int i = list->size; i < list->capacity; i++)
+    if(list->node == nullptr)
     {
-        list->node[i].data = 0;
-        list->node[i].next = i + 1;
-        list->node[i].prev = -1;
+        printf("There is news: the realloc hasn't worked\n");
+        return LIST_FAULT;
     }
+
+    Fill_free_cells(list);
 }
 
-void List_verificator(List *list)
+int List_verificator(List *list)
 {
     if(list == nullptr)
     {
-        printf("The pointer to the list structure is null! Goodbye, my darling)");
-        abort();
+        printf("The pointer to the list structure is null! Goodbye, my darling)\n");
+        return LIST_FAULT;
     }
 
     if(list->node == nullptr)
     {
-        printf("A pointer to an array with nodes is null. Your program says goodbye to you...");
-        abort();
+        printf("A pointer to an array with nodes is null. Your program says goodbye to you...\n");
+        return LIST_FAULT;
     }
 
     if(list->capacity < list->size)
     {
-        printf("The capacity exceeds the size, be careful, my beloved");
-        abort();
+        printf("The capacity exceeds the size, be careful, my beloved\n");
+        return LIST_FAULT;
+    }
+
+    if(list->capacity < 0)
+    {
+        printf("The capacity less zero, be careful, my beloved\n");
+        return LIST_FAULT;
+    }
+
+    if(list->size < 0)
+    {
+        printf("The size less zero, be careful, my beloved\n");
+        return LIST_FAULT;
     }
 
     if(list->node[0].data != POISON)
     {
-        printf("Your actions have changed the fictitious element. I didn't know you were such a bully");
-        abort();
+        printf("Your actions have changed the fictitious element. I didn't know you were such a bully\n");
+        return LIST_FAULT;
     }
+
+    return lIST_IN_ORDER;
+}
+
+int Fill_free_cells(List *list)
+{
+    if(!List_verificator(list))
+        return LIST_FAULT;
+
+    for(int i = list->size; i < list->capacity - 1; i++)
+    {
+        list->node[i].next = i + 1;
+        list->node[i].prev = -1;
+    }
+
+    list->node[list->capacity - 1].next = LAST_CONNECTION;
+    list->node[list->capacity - 1].prev = -1;
 }
 
 void List_dtor(List *list)
