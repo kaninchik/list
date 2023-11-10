@@ -100,14 +100,9 @@ int List_dump(List *list)
 
     fprintf(fp, "digraph G                                                            \n"
                 "{                                                                    \n"
+                "   graph [bgcolor = \"#ffcbdb\"]                                     \n"
                 "   rankdir = LR;                                                     \n"
-                "   node [style = \"filled\", shape = record, color = \"black\"];     \n"
-                "   size [fillcolor = \"pink\", label = \"size = %d\"];               \n"
-                "   capacity [fillcolor = \"violet\", label = \"capacity = %d\"];     \n"
-                "   free [fillcolor = \"purple\", label = \"free = %d\"];             \n"
-                "   tail [fillcolor = \"red\", label = \"tail = %d\"];                \n"
-                "   head [fillcolor = \"red\", label = \"head = %d\"];                \n",
-                list->size, list->capacity, list->free, list->node[0].prev, list->node[0].next);
+                "   node [style = \"filled\", shape = record, color = \"black\"];     \n");
 
     for(int i = 0; i < list->capacity; i++)
     {
@@ -116,18 +111,18 @@ int List_dump(List *list)
                             "{ <prev> prev = %d |data = %d| <next> next = %d}\"];\n",
                         i, i, list->node[i].prev, list->node[i].data, list->node[i].next);
         else
-            fprintf(fp,     "    node%d [fillcolor = \"pink\", label = \" %d |"
+            fprintf(fp,     "    node%d [fillcolor = \"#f64a8a\", label = \" %d |"
                             "{ <prev> prev = %d |data = %d| <next> next = %d}\"];\n",
                         i, i, list->node[i].prev, list->node[i].data, list->node[i].next);
     }
 
     fprintf(fp, "   edge [style = invis];\n");
     for(int i = 0; i < list->capacity - 1; i++)
-        fprintf(fp, "    node%d: <next> -> node%d: <next>;\n", i, i + 1);
+        fprintf(fp, "    node%d -> node%d;\n", i, i + 1);
 
     fprintf(fp, "   edge [color = \"black\", style = solid, weight = 0];\n");
     for(int i = 0; i < list->capacity - 1; i++)
-        fprintf(fp, "    node%d: <next> -> node%d;\n", i, list->node[i].next);
+        fprintf(fp, "    node%d -> node%d;\n", i, list->node[i].next);
 
     /*fprintf(fp, "   edge [color = \"blue\", constraint = false, style = solid, weight = 0];\n");
     for(int i = 0; i < list->capacity - 1; i++)
@@ -137,7 +132,14 @@ int List_dump(List *list)
     }
     */
 
-    fprintf(fp, "   edge [color = \"green\", style = bold, constraint = false];              \n");
+    fprintf(fp, "   size [fillcolor = \"pink\", label = \"size = %d\"];               \n"
+                "   capacity [fillcolor = \"violet\", label = \"capacity = %d\"];     \n"
+                "   free [fillcolor = \"purple\", label = \"free = %d\"];             \n"
+                "   tail [fillcolor = \"red\", label = \"tail = %d\"];                \n"
+                "   head [fillcolor = \"red\", label = \"head = %d\"];                \n",
+                list->size, list->capacity, list->free, list->node[0].prev, list->node[0].next);
+
+    fprintf(fp, "   edge [color = \"#ab274f\", style = bold, constraint = false];           \n");
     fprintf(fp, "   free -> node%d;                                                          \n"
                 "   tail  -> node%d;                                                         \n"
                 "   head  -> node%d;                                                         \n",
@@ -332,6 +334,19 @@ int Fill_free_cells(List *list)
 
     list->node[list->capacity - 1].next = LAST_CONNECTION;
     list->node[list->capacity - 1].prev = -1;
+}
+
+int Find_phys_index(List *list, size_t logical_index)
+{
+    if(!List_verificator(list))
+        return LIST_FAULT;
+
+    size_t phys_index = list->node[0].next;
+
+    for(int i = 1; i < logical_index; i++)
+        phys_index = list->node[phys_index].next;
+
+    return phys_index;
 }
 
 void List_dtor(List *list)

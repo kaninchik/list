@@ -20,6 +20,7 @@ struct List
 
 int List_ctor(List *list, int capacity);
 int Push_front(List *list, list_t elem);
+int Find_phys_index(List *list, size_t logical_index);
 int Insert_after(List *list, size_t index, list_t elem);
 int Insert_before(List *list, size_t index, list_t elem);
 int Delete(List *list, size_t index, list_t *elem);
